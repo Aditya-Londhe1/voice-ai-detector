@@ -1,16 +1,14 @@
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
+from typing import Optional
+import os
 
 from api.detector import VoiceDetector
 
 
-
 # ---------------- CONFIG ----------------
 
-import os
-
 API_KEY = os.getenv("API_KEY", "default_key")
-
 
 ALLOWED_LANGS = ["ta", "en", "hi", "ml", "te"]
 
@@ -29,7 +27,11 @@ detector = VoiceDetector()
 
 class DetectRequest(BaseModel):
 
-    audio_base64: str
+    # Support both formats
+    audio_base64: Optional[str] = None   # snake_case
+    audioBase64: Optional[str] = None    # camelCase (tester)
+    audioFormat: Optional[str] = None
+
     language: str
 
 
@@ -48,22 +50,32 @@ def detect_voice(
     x_api_key: str = Header(None)
 ):
 
-    # Auth
+    # -------- AUTH --------
     if x_api_key != API_KEY:
-        raise HTTPException(401, "Invalid API Key")
+        raise HTTPException(status_code=401, detail="Invalid API Key")
 
-    # Language check
+
+    # -------- LANGUAGE CHECK --------
     if data.language not in ALLOWED_LANGS:
-        raise HTTPException(400, "Unsupported language")
+        raise HTTPException(status_code=400, detail="Unsupported language")
 
+
+    # -------- GET AUDIO --------
+    audio_b64 = data.audio_base64 or data.audioBase64
+
+    if not audio_b64:
+        raise HTTPException(status_code=400, detail="No audio provided")
+
+
+    # -------- PREDICT --------
     try:
-        prob = detector.predict(data.audio_base64)
+        prob = detector.predict(audio_b64)
 
-    except Exception as e:
-        raise HTTPException(400, "Invalid audio format")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid audio format")
 
 
-    # Result
+    # -------- RESULT --------
     if prob > 0.5:
         result = "AI_GENERATED"
     else:
@@ -72,7 +84,7 @@ def detect_voice(
 
     return {
         "result": result,
-        "confidence": round(prob, 3),
+        "confidence": round(float(prob), 3),
         "language": data.language
     }
 
