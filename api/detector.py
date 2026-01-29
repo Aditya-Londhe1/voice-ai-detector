@@ -1,3 +1,5 @@
+print("### NEW DECODER VERSION ACTIVE ###")
+
 import torch
 import base64
 import io
