@@ -18,6 +18,8 @@ from rawnet.features import extract_mfcc
 class VoiceDetector:
 
     def __init__(self):
+        torch.set_num_threads(1)
+
 
         self.device = "cpu"
 
