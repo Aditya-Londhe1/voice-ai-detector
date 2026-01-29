@@ -1,33 +1,28 @@
 from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import os
 
 from api.detector import VoiceDetector
 
-
-# ---------------- CONFIG ----------------
 
 API_KEY = os.getenv("API_KEY", "default_key")
 
 ALLOWED_LANGS = ["ta", "en", "hi", "ml", "te"]
 
 
-# ---------------- INIT ----------------
+app = FastAPI(title="Voice AI Detector", version="1.0")
 
-app = FastAPI(
-    title="Voice AI Detector",
-    version="1.0"
-)
-
-# Load model ONCE (IMPORTANT)
 detector = VoiceDetector()
 
 
 # ---------------- SCHEMA ----------------
 
 class DetectRequest(BaseModel):
-    audio_base64: str
+    audio_base64: str = Field(..., alias="audioBase64")
     language: str
+
+    class Config:
+        populate_by_name = True
 
 
 class DetectResponse(BaseModel):
@@ -44,11 +39,9 @@ def detect_voice(
     x_api_key: str = Header(None)
 ):
 
-    # Auth
     if x_api_key != API_KEY:
         raise HTTPException(401, "Invalid API Key")
 
-    # Language
     if data.language not in ALLOWED_LANGS:
         raise HTTPException(400, "Unsupported language")
 
@@ -59,19 +52,12 @@ def detect_voice(
         print("Prediction error:", e)
         raise HTTPException(400, "Invalid audio format")
 
-    if prob > 0.5:
-        result = "AI_GENERATED"
-    else:
-        result = "HUMAN"
-
     return {
-        "result": result,
+        "result": "AI_GENERATED" if prob > 0.5 else "HUMAN",
         "confidence": round(prob, 3),
         "language": data.language
     }
 
-
-# ---------------- HEALTH ----------------
 
 @app.get("/")
 def root():
