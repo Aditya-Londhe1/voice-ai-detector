@@ -34,33 +34,44 @@ class VoiceDetector:
 
     def decode_audio(self, base64_audio):
 
-        # Decode base64
-        audio_bytes = base64.b64decode(base64_audio)
+        # Remove spaces and newlines
+        base64_audio = base64_audio.strip().replace("\n", "").replace(" ", "")
 
-        # Convert to in-memory file
+        # Remove data URI prefix if present
+        if base64_audio.startswith("data:"):
+            base64_audio = base64_audio.split(",")[1]
+
+        # Fix padding if missing
+        missing_padding = len(base64_audio) % 4
+        if missing_padding:
+            base64_audio += "=" * (4 - missing_padding)
+
+        try:
+            # Decode safely
+            audio_bytes = base64.b64decode(base64_audio, validate=False)
+
+        except Exception:
+            raise ValueError("Base64 decode failed")
+
         buffer = io.BytesIO(audio_bytes)
 
         try:
-            # Use soundfile (more stable than librosa)
             audio, sr = sf.read(buffer)
 
         except Exception:
             raise ValueError("Cannot decode WAV file")
 
-
         # Convert stereo to mono
         if len(audio.shape) > 1:
             audio = np.mean(audio, axis=1)
 
-
-        # Resample if needed
+        # Resample
         if sr != 16000:
             audio = librosa.resample(
                 audio,
                 orig_sr=sr,
                 target_sr=16000
             )
-
 
         return audio
 
