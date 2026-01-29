@@ -1,6 +1,5 @@
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 import os
 
 from api.detector import VoiceDetector
@@ -20,23 +19,18 @@ app = FastAPI(
     version="1.0"
 )
 
+# Load model ONCE (IMPORTANT)
 detector = VoiceDetector()
 
 
 # ---------------- SCHEMA ----------------
 
 class DetectRequest(BaseModel):
-
-    # Support both formats
-    audio_base64: Optional[str] = None   # snake_case
-    audioBase64: Optional[str] = None    # camelCase (tester)
-    audioFormat: Optional[str] = None
-
+    audio_base64: str
     language: str
 
 
 class DetectResponse(BaseModel):
-
     result: str
     confidence: float
     language: str
@@ -50,41 +44,29 @@ def detect_voice(
     x_api_key: str = Header(None)
 ):
 
-    # -------- AUTH --------
+    # Auth
     if x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API Key")
+        raise HTTPException(401, "Invalid API Key")
 
-
-    # -------- LANGUAGE CHECK --------
+    # Language
     if data.language not in ALLOWED_LANGS:
-        raise HTTPException(status_code=400, detail="Unsupported language")
+        raise HTTPException(400, "Unsupported language")
 
-
-    # -------- GET AUDIO --------
-    audio_b64 = data.audio_base64 or data.audioBase64
-
-    if not audio_b64:
-        raise HTTPException(status_code=400, detail="No audio provided")
-
-
-    # -------- PREDICT --------
     try:
-        prob = detector.predict(audio_b64)
+        prob = detector.predict(data.audio_base64)
 
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid audio format")
+    except Exception as e:
+        print("Prediction error:", e)
+        raise HTTPException(400, "Invalid audio format")
 
-
-    # -------- RESULT --------
     if prob > 0.5:
         result = "AI_GENERATED"
     else:
         result = "HUMAN"
 
-
     return {
         "result": result,
-        "confidence": round(float(prob), 3),
+        "confidence": round(prob, 3),
         "language": data.language
     }
 
