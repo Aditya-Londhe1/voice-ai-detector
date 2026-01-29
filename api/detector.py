@@ -1,8 +1,11 @@
+import torch
 import base64
 import io
 import numpy as np
-from scipy.io import wavfile
+import soundfile as sf
 import librosa
+from scipy.io import wavfile
+
 import sys
 import os
 
@@ -32,11 +35,7 @@ class VoiceDetector:
 
     def decode_audio(self, base64_audio):
 
-        import base64
-        import io
-        import numpy as np
-        from scipy.io import wavfile
-        import librosa
+        
 
         # Clean base64
         base64_audio = base64_audio.strip().replace("\n", "").replace(" ", "")
