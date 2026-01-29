@@ -1,5 +1,3 @@
-print("### NEW DECODER VERSION ACTIVE ###")
-
 import torch
 import base64
 import io
@@ -36,46 +34,48 @@ class VoiceDetector:
 
     def decode_audio(self, base64_audio):
 
-        # Remove spaces and newlines
+        print("=== START DECODING AUDIO ===")
+
+        # Clean
         base64_audio = base64_audio.strip().replace("\n", "").replace(" ", "")
 
-        # Remove data URI prefix if present
         if base64_audio.startswith("data:"):
             base64_audio = base64_audio.split(",")[1]
 
-        # Fix padding if missing
-        missing_padding = len(base64_audio) % 4
-        if missing_padding:
-            base64_audio += "=" * (4 - missing_padding)
+        print("Base64 length:", len(base64_audio))
 
+        # Decode
         try:
-            # Decode safely
             audio_bytes = base64.b64decode(base64_audio, validate=False)
-
-        except Exception:
-            raise ValueError("Base64 decode failed")
+            print("Decoded bytes:", len(audio_bytes))
+        except Exception as e:
+            print("Base64 decode error:", e)
+            raise
 
         buffer = io.BytesIO(audio_bytes)
 
+        # Try soundfile
         try:
             audio, sr = sf.read(buffer)
+            print("Soundfile OK:", audio.shape, sr)
+        except Exception as e:
+            print("Soundfile error:", e)
+            raise
 
-        except Exception:
-            raise ValueError("Cannot decode WAV file")
-
-        # Convert stereo to mono
+        # Mono
         if len(audio.shape) > 1:
             audio = np.mean(audio, axis=1)
+            print("Converted to mono")
 
         # Resample
         if sr != 16000:
-            audio = librosa.resample(
-                audio,
-                orig_sr=sr,
-                target_sr=16000
-            )
+            audio = librosa.resample(audio, sr, 16000)
+            print("Resampled")
+
+        print("=== AUDIO READY ===")
 
         return audio
+
 
 
     def predict(self, base64_audio):
