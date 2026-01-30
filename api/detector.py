@@ -4,6 +4,9 @@ import io
 import numpy as np
 from scipy.io import wavfile
 import librosa
+import soundfile as sf
+import tempfile
+import uuid
 import os
 import sys
 
@@ -43,28 +46,37 @@ class VoiceDetector:
         if missing:
             base64_audio += "=" * (4 - missing)
 
-        audio_bytes = base64.b64decode(base64_audio)
+        try:
+            audio_bytes = base64.b64decode(base64_audio)
+        except Exception:
+             # invalid base64
+            return np.zeros(16000, dtype=np.float32)
 
-        buffer = io.BytesIO(audio_bytes)
+        # Write to temp file for librosa to load (handles mp3, wav, etc.)
+        # suffix .mp3 helps librosa/soundfile guess format if header is ambiguous,
+        # but usually header detection works. Let's use a generic name or try to detect?
+        # MP3 input is expected.
+        path = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()) + ".mp3")
+        
+        with open(path, "wb") as f:
+            f.write(audio_bytes)
 
-        sr, audio = wavfile.read(buffer)
+        try:
+            # sr=16000 ensures resampling happens during load
+            audio, _ = librosa.load(path, sr=16000, mono=True)
+        except Exception as e:
+            print(f"Error loading audio: {e}")
+            if os.path.exists(path):
+                os.remove(path)
+            return np.zeros(16000, dtype=np.float32)
+        
+        if os.path.exists(path):
+            os.remove(path)
 
-        # normalize
-        if audio.dtype != np.float32:
-            audio = audio.astype(np.float32) / np.max(np.abs(audio))
-
-        # stereo → mono
-        if audio.ndim > 1:
-            audio = np.mean(audio, axis=1)
-
-        # resample
-        if sr != 16000:
-            audio = librosa.resample(audio, sr, 16000)
-
-        # pad
+        # pad if too short
         if len(audio) < 16000:
             audio = librosa.util.fix_length(audio, 16000)
-
+            
         return audio
 
 
