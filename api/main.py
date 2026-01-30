@@ -42,10 +42,13 @@ async def detect(request: Request, x_api_key: str = Header(None)):
         print("ERROR:", e)
         raise HTTPException(400, "Invalid audio")
 
+    classification = "AI_GENERATED" if prob > 0.5 else "HUMAN"
+    explanation = f"Analysis indicates {classification} voice with {round(prob, 3)} confidence."
+
     return {
-        "result": "AI_GENERATED" if prob > 0.5 else "HUMAN",
+        "classification": classification,
         "confidence": round(prob, 3),
-        "language": lang
+        "explanation": explanation
     }
 
 
