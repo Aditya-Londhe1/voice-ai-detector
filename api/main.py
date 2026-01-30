@@ -1,5 +1,4 @@
-from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import FastAPI, Header, HTTPException, Request
 import os
 
 from api.detector import VoiceDetector
@@ -12,50 +11,41 @@ ALLOWED_LANGS = ["ta", "en", "hi", "ml", "te"]
 
 app = FastAPI(title="Voice AI Detector", version="1.0")
 
+# load model once
 detector = VoiceDetector()
 
 
-# ---------------- SCHEMA ----------------
-
-class DetectRequest(BaseModel):
-    audio_base64: str = Field(..., alias="audioBase64")
-    language: str
-
-    class Config:
-        populate_by_name = True
-
-
-class DetectResponse(BaseModel):
-    result: str
-    confidence: float
-    language: str
-
-
-# ---------------- API ----------------
-
-@app.post("/detect", response_model=DetectResponse)
-def detect_voice(
-    data: DetectRequest,
-    x_api_key: str = Header(None)
-):
+@app.post("/detect")
+async def detect(request: Request, x_api_key: str = Header(None)):
 
     if x_api_key != API_KEY:
-        raise HTTPException(401, "Invalid API Key")
+        raise HTTPException(401, "Invalid API key")
 
-    if data.language not in ALLOWED_LANGS:
-        raise HTTPException(400, "Unsupported language")
+    body = await request.json()
+
+    # accept both names
+    audio = body.get("audio_base64") or body.get("audioBase64")
+    lang = body.get("language")
+
+    if not audio:
+        raise HTTPException(400, "audio missing")
+
+    if not lang:
+        raise HTTPException(400, "language missing")
+
+    if lang not in ALLOWED_LANGS:
+        raise HTTPException(400, "unsupported language")
 
     try:
-        prob = detector.predict(data.audio_base64)
-
+        prob = detector.predict(audio)
     except Exception as e:
-        print("Prediction error:", e)
-        raise HTTPException(400, "Invalid audio format")
+        print("ERROR:", e)
+        raise HTTPException(400, "Invalid audio")
 
     return {
         "result": "AI_GENERATED" if prob > 0.5 else "HUMAN",
         "confidence": round(prob, 3),
-        "language": data.language
+        "language": lang
     }
 
 
