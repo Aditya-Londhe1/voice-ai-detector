@@ -1,12 +1,14 @@
 fastapi
 uvicorn
+
+librosa
+numpy
+soundfile
 pydantic
 requests
-
-numpy
 scipy
-soundfile
-librosa
+python-multipart
+
 
 torch==2.10.0+cpu
 --extra-index-url https://download.pytorch.org/whl/cpu
